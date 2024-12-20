@@ -2,6 +2,8 @@
 
 Bubble is a modern, intuitive thought-capturing application designed to help you organize and manage your ideas efficiently.
 
+![Bubble Application Screenshot](img/Bubble.PNG)
+
 ## Features
 
 - **Create and Edit Thoughts**: Easily add new thoughts or edit existing ones using a rich text editor.
