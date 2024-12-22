@@ -5,6 +5,7 @@ import { FaRobot, FaSave, FaTimes } from 'react-icons/fa';
 import confetti from 'canvas-confetti';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import '../styles/quill-dark.css';
 
 interface ThoughtStatsProps {
   thought: Thought | null;
@@ -194,7 +195,7 @@ const ThoughtEditor: React.FC<ThoughtEditorProps> = ({
           modules={modules}
           formats={formats}
           placeholder="Body"
-          className={`${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-700'}`}
+          className={`${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-700'} transition-colors duration-200`}
         />
       </div>
       <input

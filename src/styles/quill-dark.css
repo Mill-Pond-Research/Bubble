@@ -1,0 +1,88 @@
+.react-quill-dark .ql-toolbar.ql-snow {
+  border-color: #4B5563;
+  background-color: #374151;
+}
+
+.react-quill-dark .ql-container.ql-snow {
+  border-color: #4B5563;
+  background-color: #374151;
+}
+
+.react-quill-dark .ql-toolbar.ql-snow .ql-picker-label {
+  color: #E5E7EB;
+  background-color: #374151;
+}
+
+.react-quill-dark .ql-toolbar.ql-snow .ql-stroke {
+  stroke: #E5E7EB;
+}
+
+.react-quill-dark .ql-toolbar.ql-snow .ql-fill {
+  fill: #E5E7EB;
+}
+
+.react-quill-dark .ql-editor {
+  background-color: #374151;
+  color: #E5E7EB;
+}
+
+.react-quill-dark .ql-editor.ql-blank::before {
+  color: #9CA3AF;
+}
+
+.react-quill-dark .ql-picker-options {
+  background-color: #374151 !important;
+  border-color: #4B5563;
+}
+
+.react-quill-dark .ql-picker-item {
+  color: #E5E7EB;
+  background-color: #374151;
+}
+
+.react-quill-dark .ql-toolbar.ql-snow .ql-picker-label:hover,
+.react-quill-dark .ql-toolbar.ql-snow .ql-picker-label.ql-active,
+.react-quill-dark .ql-toolbar.ql-snow .ql-picker-item:hover,
+.react-quill-dark .ql-toolbar.ql-snow .ql-picker-item.ql-selected {
+  color: #60A5FA;
+}
+
+.react-quill-dark .ql-toolbar.ql-snow .ql-stroke:hover,
+.react-quill-dark .ql-toolbar.ql-snow .ql-active .ql-stroke {
+  stroke: #60A5FA;
+}
+
+.react-quill-dark .ql-toolbar.ql-snow .ql-fill:hover,
+.react-quill-dark .ql-toolbar.ql-snow .ql-active .ql-fill {
+  fill: #60A5FA;
+}
+
+/* Fix for dropdown backgrounds */
+.react-quill-dark .ql-snow .ql-picker.ql-expanded .ql-picker-options {
+  background-color: #374151;
+  border-color: #4B5563;
+}
+
+/* Fix for tooltip backgrounds */
+.react-quill-dark .ql-tooltip {
+  background-color: #374151 !important;
+  color: #E5E7EB !important;
+  border-color: #4B5563 !important;
+}
+
+.react-quill-dark .ql-tooltip input[type=text] {
+  background-color: #4B5563;
+  color: #E5E7EB;
+  border-color: #6B7280;
+}
+
+/* Fix for code block and other formatted text backgrounds */
+.react-quill-dark .ql-editor pre.ql-syntax,
+.react-quill-dark .ql-editor code {
+  background-color: #1F2937;
+  color: #E5E7EB;
+}
+
+.react-quill-dark .ql-snow a {
+  color: #60A5FA;
+} 
