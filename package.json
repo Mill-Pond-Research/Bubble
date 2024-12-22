@@ -3,20 +3,53 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "dist/electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on tcp:5173 && tsc -p electron && node ./scripts/rename-js-to-cjs.js && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "npm run build && tsc -p electron && node ./scripts/rename-js-to-cjs.js && electron-builder",
+    "server:dev": "cd server && npm run dev",
+    "dev:all": "concurrently \"npm run server:dev\" \"npm run electron:dev\""
+  },
+  "build": {
+    "appId": "com.millpond.bubble",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.9.5",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/node": "^22.10.2",
+    "@types/uuid": "^10.0.0",
+    "axios": "^1.7.9",
+    "canvas-confetti": "^1.9.3",
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^18.2.0",
+    "react-icons": "^5.4.0",
     "react-markdown": "^9.0.1",
     "react-quill": "^2.0.0",
-    "react-redux": "^8.0.5"
+    "react-redux": "^8.0.5",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@types/react": "^18.0.28",
@@ -26,13 +59,18 @@
     "@typescript-eslint/parser": "^5.57.1",
     "@vitejs/plugin-react": "^4.0.0",
     "autoprefixer": "^10.4.14",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.9.1",
     "eslint": "^8.38.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.3.4",
     "postcss": "^8.4.23",
     "tailwindcss": "^3.3.2",
     "typescript": "^5.0.2",
-    "vite": "^4.3.2"
+    "vite": "^4.3.2",
+    "wait-on": "^8.0.1"
   },
   "description": "Bubble - A thought organization tool by Mill Pond Research",
   "author": "Mill Pond Research",

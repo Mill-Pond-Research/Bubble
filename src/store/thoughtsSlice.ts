@@ -8,6 +8,7 @@ export interface Thought {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  order?: number;
 }
 
 interface ThoughtsState {
@@ -18,6 +19,7 @@ interface ThoughtsState {
   sortBy: 'createdAt' | 'updatedAt' | 'title';
   sortOrder: 'asc' | 'desc';
   selectedTag: string | null;
+  customOrder: string[];
 }
 
 const initialState: ThoughtsState = {
@@ -28,6 +30,7 @@ const initialState: ThoughtsState = {
   sortBy: 'updatedAt',
   sortOrder: 'desc',
   selectedTag: null,
+  customOrder: [],
 };
 
 const thoughtsSlice = createSlice({
@@ -74,6 +77,24 @@ const thoughtsSlice = createSlice({
     setSelectedTag: (state, action: PayloadAction<string | null>) => {
       state.selectedTag = action.payload;
     },
+    reorderThoughts: (state, action: PayloadAction<{ fromIndex: number; toIndex: number }>) => {
+      const { fromIndex, toIndex } = action.payload;
+      const customOrder = [...state.customOrder];
+      const [removed] = customOrder.splice(fromIndex, 1);
+      customOrder.splice(toIndex, 0, removed);
+      state.customOrder = customOrder;
+      
+      // Update the order property of all thoughts
+      state.thoughts.forEach((thought, index) => {
+        const orderIndex = customOrder.indexOf(thought.id);
+        thought.order = orderIndex >= 0 ? orderIndex : index;
+      });
+    },
+    initializeCustomOrder: (state) => {
+      if (state.customOrder.length === 0) {
+        state.customOrder = state.thoughts.map(thought => thought.id);
+      }
+    },
   },
 });
 
@@ -87,7 +108,9 @@ export const {
   setSearchQuery,
   setSortBy,
   setSortOrder,
-  setSelectedTag
+  setSelectedTag,
+  reorderThoughts,
+  initializeCustomOrder
 } = thoughtsSlice.actions;
 
 export default thoughtsSlice.reducer;
@@ -137,4 +160,15 @@ export const selectTotalPages = (state: RootState, perPage: number) => {
 
 export const selectThoughtsLoading = (state: RootState) => state.thoughts.loading;
 export const selectThoughtsError = (state: RootState) => state.thoughts.error;
+
+export const selectThoughtsInOrder = (state: { thoughts: ThoughtsState }) => {
+  if (state.thoughts.customOrder.length === 0) {
+    return state.thoughts.thoughts;
+  }
+  
+  const thoughtsMap = new Map(state.thoughts.thoughts.map(t => [t.id, t]));
+  return state.thoughts.customOrder
+    .map(id => thoughtsMap.get(id))
+    .filter((t): t is Thought => t !== undefined);
+};
  

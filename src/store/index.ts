@@ -1,11 +1,13 @@
 import { configureStore } from '@reduxjs/toolkit';
 import thoughtsReducer from './thoughtsSlice';
 import appReducer from './appSlice';
+import settingsReducer from './settingsSlice';
 
 export const store = configureStore({
   reducer: {
     thoughts: thoughtsReducer,
     app: appReducer,
+    settings: settingsReducer,
   },
 });
 

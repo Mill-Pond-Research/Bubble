@@ -1,216 +1,257 @@
-import React, { useState, useMemo } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useState, useCallback } from 'react';
+import { useDrag, useDrop } from 'react-dnd';
+import { Thought } from '../store/thoughtsSlice';
+import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { Thought, updateThought, deleteThought, selectFilteredThoughts, selectSelectedTag } from '../store/thoughtsSlice';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { deleteThoughtFile } from '../utils/storage';
+import DeleteCautionPopup from './DeleteCautionPopup';
+import { SortMethod } from './Header';
+import { FaEdit, FaTrash } from 'react-icons/fa';
 
 interface ThoughtListProps {
+  thoughts: Thought[];
   onEditThought: (thought: Thought) => void;
+  onDeleteThought: (thoughtId: string) => void;
+  onCombineThoughts: (sourceId: string, targetId: string) => void;
+  onReorderThought?: (dragIndex: number, hoverIndex: number) => void;
+  searchQuery: string;
+  selectedTag: string | null;
+  layout: 'list' | 'grid';
+  sortMethod: SortMethod;
 }
 
-type SortOption = 'dateNewest' | 'dateOldest' | 'titleAZ' | 'titleZA';
-type LayoutOption = 'card' | 'grid' | 'list';
-
-const ThoughtList: React.FC<ThoughtListProps> = ({ onEditThought }) => {
-  const dispatch = useDispatch();
-  const thoughts = useSelector(selectFilteredThoughts);
-  const selectedTag = useSelector(selectSelectedTag);
+const ThoughtItem: React.FC<{
+  thought: Thought;
+  onEdit: () => void;
+  onDelete: () => void;
+  onCombine: (sourceId: string, targetId: string) => void;
+  onReorder?: (dragIndex: number, hoverIndex: number) => void;
+  index: number;
+  layout: 'list' | 'grid';
+  sortMethod: SortMethod;
+}> = ({ thought, onEdit, onDelete, onCombine, onReorder, index, layout, sortMethod }) => {
   const isDarkMode = useSelector((state: RootState) => state.app.isDarkMode);
-  const searchQuery = useSelector((state: RootState) => state.thoughts.searchQuery);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
 
-  const [sortOption, setSortOption] = useState<SortOption>('dateNewest');
-  const [layoutOption, setLayoutOption] = useState<LayoutOption>('card');
+  const handleDelete = useCallback(() => {
+    const hasSeenCaution = localStorage.getItem('hasSeenDeleteCaution');
+    if (hasSeenCaution) {
+      onDelete();
+    } else {
+      setShowDeletePopup(true);
+    }
+  }, [onDelete]);
 
-  const sortedThoughts = useMemo(() => {
-    return [...thoughts].sort((a, b) => {
-      switch (sortOption) {
-        case 'dateNewest':
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-        case 'dateOldest':
-          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-        case 'titleAZ':
-          return a.title.localeCompare(b.title);
-        case 'titleZA':
-          return b.title.localeCompare(a.title);
-        default:
-          return 0;
+  const handleConfirmDelete = useCallback(() => {
+    localStorage.setItem('hasSeenDeleteCaution', 'true');
+    setShowDeletePopup(false);
+    onDelete();
+  }, [onDelete]);
+
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: sortMethod === 'custom' ? 'reorder' : 'thought',
+    item: { id: thought.id, index },
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+    }),
+  }), [thought.id, index, sortMethod]);
+
+  const [{ isOver }, drop] = useDrop(() => ({
+    accept: sortMethod === 'custom' ? 'reorder' : 'thought',
+    drop: (item: { id: string; index: number }) => {
+      if (sortMethod === 'custom') {
+        if (item.index !== index) {
+          onReorder?.(item.index, index);
+        }
+      } else if (item.id !== thought.id) {
+        onCombine(item.id, thought.id);
       }
-    });
-  }, [thoughts, sortOption]);
+    },
+    collect: (monitor) => ({
+      isOver: !!monitor.isOver(),
+    }),
+  }), [thought.id, index, sortMethod, onReorder, onCombine]);
 
-  const onDragEnd = (result: DropResult) => {
-    if (!result.destination) {
-      return;
-    }
+  const itemClasses = `${
+    layout === 'grid' ? 'w-full sm:w-1/2 md:w-1/3 lg:w-1/4 p-2' : 'w-full mb-4'
+  }`;
 
-    const sourceIndex = parseInt(result.source.index);
-    const destIndex = parseInt(result.destination.index);
+  const contentClasses = `p-4 rounded-lg shadow-md transition-all duration-200 ${
+    isDarkMode
+      ? 'bg-gray-800 text-white hover:bg-gray-700'
+      : 'bg-white text-gray-800 hover:bg-gray-50'
+  } ${isDragging ? 'opacity-50' : ''} ${isOver ? 'border-2 border-blue-500' : ''} ${
+    sortMethod === 'custom' ? 'cursor-move' : ''
+  }`;
 
-    if (sourceIndex === destIndex) {
-      return;
-    }
-
-    const sourceThought = thoughts[sourceIndex];
-    const destThought = thoughts[destIndex];
-
-    // Combine thoughts
-    const combinedThought: Thought = {
-      ...destThought,
-      body: `${destThought.body}\n\n${sourceThought.body}`,
-      tags: [...new Set([...destThought.tags, ...sourceThought.tags])],
-      updatedAt: new Date().toISOString(),
-    };
-
-    dispatch(updateThought(combinedThought));
-    dispatch(deleteThought(sourceThought.id));
-  };
-
-  const truncateBody = (body: string, maxLength: number = 400) => {
-    // Remove any HTML tags
-    const textOnly = body.replace(/<[^>]*>/g, '');
-    // Remove any Markdown formatting
-    const plainText = textOnly.replace(/[*_~`#\-\[\]]/g, '');
-    if (plainText.length <= maxLength) return plainText;
-    return plainText.slice(0, maxLength) + '...';
-  };
-
-  const handleDeleteThought = async (thought: Thought) => {
-    if (window.confirm(`Are you sure you want to delete "${thought.title}"?`)) {
-      try {
-        await deleteThoughtFile(thought);
-        dispatch(deleteThought(thought.id));
-      } catch (error) {
-        console.error('Error deleting thought:', error);
-        alert('Failed to delete thought. Please try again.');
-      }
-    }
-  };
-
-  const renderThought = (thought: Thought, index: number) => {
-    const content = (
-      <>
-        <h3 className="text-xl font-semibold mb-2">{thought.title}</h3>
-        <p className={`mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-          {truncateBody(thought.body)}
-        </p>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {thought.tags.map((tag, tagIndex) => (
-            <span
-              key={tagIndex}
-              className={`px-2 py-1 text-sm rounded-full ${
-                isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'
-              }`}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => onEditThought(thought)}
-            className={`mt-2 px-3 py-1 text-sm rounded ${
-              isDarkMode
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-green-500 text-white hover:bg-green-600'
-            } transition-colors`}
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => handleDeleteThought(thought)}
-            className={`mt-2 px-3 py-1 text-sm rounded ${
-              isDarkMode
-                ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-red-500 text-white hover:bg-red-600'
-            } transition-colors`}
-          >
-            Delete
-          </button>
-        </div>
-      </>
-    );
-
-    return (
-      <Draggable key={thought.id} draggableId={thought.id} index={index}>
-        {(provided) => (
-          <li
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            {...provided.dragHandleProps}
-            className={`p-4 rounded-lg shadow ${
-              isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
-            } ${layoutOption === 'list' ? 'mb-4' : ''}`}
-          >
-            {content}
-          </li>
-        )}
-      </Draggable>
-    );
-  };
+  const excerptLength = layout === 'list' ? 300 : 100;
 
   return (
-    <div className="thought-list">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-          Your Thoughts
-          {selectedTag && <span className="text-blue-500 ml-2">- Tag: {selectedTag}</span>}
-          {searchQuery && <span className="text-blue-500 ml-2">- Search: "{searchQuery}"</span>}
-        </h2>
-        <div className="flex gap-4">
-          <select
-            value={sortOption}
-            onChange={(e) => setSortOption(e.target.value as SortOption)}
-            className={`px-2 py-1 rounded ${
-              isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-800'
-            }`}
-          >
-            <option value="dateNewest">Newest</option>
-            <option value="dateOldest">Oldest</option>
-            <option value="titleAZ">Title A-Z</option>
-            <option value="titleZA">Title Z-A</option>
-          </select>
-          <select
-            value={layoutOption}
-            onChange={(e) => setLayoutOption(e.target.value as LayoutOption)}
-            className={`px-2 py-1 rounded ${
-              isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-800'
-            }`}
-          >
-            <option value="card">Card</option>
-            <option value="grid">Grid</option>
-            <option value="list">List</option>
-          </select>
-        </div>
-      </div>
-      {sortedThoughts.length === 0 ? (
-        <p className={`text-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-          No thoughts found. {selectedTag ? `Try selecting a different tag or create a new thought with the "${selectedTag}" tag.` : searchQuery ? `No results for "${searchQuery}".` : 'Start by adding a new thought!'}
+    <div className={itemClasses}>
+      <div ref={(node) => drag(drop(node))} className={contentClasses}>
+        <h3 className="text-xl font-bold mb-2">{thought.title}</h3>
+        <p className={`mb-4 ${layout === 'list' ? 'text-base' : 'text-sm'}`}>
+          {thought.body.length > excerptLength
+            ? `${thought.body.substring(0, excerptLength)}...`
+            : thought.body}
         </p>
-      ) : (
-        <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="thoughts">
-            {(provided) => (
-              <ul
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                className={`${
-                  layoutOption === 'card'
-                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-                    : layoutOption === 'grid'
-                    ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
-                    : 'space-y-4'
-                }`}
+        {layout === 'grid' ? (
+          <>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {thought.tags.slice(0, 5).map((tag) => (
+                <span
+                  key={tag}
+                  className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                    isDarkMode
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}
+                >
+                  {tag}
+                </span>
+              )).concat(
+                thought.tags.length > 5 
+                  ? [(
+                      <span
+                        key="more"
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          isDarkMode
+                            ? 'bg-gray-600 text-white'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        +{thought.tags.length - 5} more
+                      </span>
+                    )]
+                  : []
+              )}
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={onEdit}
+                className="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors flex items-center gap-2"
               >
-                {sortedThoughts.map((thought, index) => renderThought(thought, index))}
-                {provided.placeholder}
-              </ul>
-            )}
-          </Droppable>
-        </DragDropContext>
+                <FaEdit className="text-lg" />
+                Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2"
+              >
+                <FaTrash className="text-lg" />
+                Delete
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center gap-2 flex-grow">
+              {thought.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                    isDarkMode
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}
+                >
+                  {tag}
+                </span>
+              ))}
+              <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Created: {new Date(parseInt(thought.createdAt)).toLocaleString()}
+                {thought.updatedAt !== thought.createdAt && 
+                  ` • Modified: ${new Date(parseInt(thought.updatedAt)).toLocaleString()}`
+                }
+              </span>
+            </div>
+            <div className="flex space-x-2 ml-4">
+              <button
+                onClick={onEdit}
+                className="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors flex items-center gap-2"
+              >
+                <FaEdit className="text-lg" />
+                Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2"
+              >
+                <FaTrash className="text-lg" />
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {showDeletePopup && (
+        <DeleteCautionPopup
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setShowDeletePopup(false)}
+        />
       )}
     </div>
   );
 };
 
-export default ThoughtList; 
+const ThoughtList: React.FC<ThoughtListProps> = ({
+  thoughts,
+  onEditThought,
+  onDeleteThought,
+  onCombineThoughts,
+  onReorderThought,
+  searchQuery,
+  selectedTag,
+  layout,
+  sortMethod,
+}) => {
+  const filteredThoughts = thoughts
+    .filter(
+      (thought) =>
+        (selectedTag ? thought.tags.includes(selectedTag) : true) &&
+        (thought.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          thought.body.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          thought.tags.some((tag) =>
+            tag.toLowerCase().includes(searchQuery.toLowerCase())
+          ))
+    );
+
+  const sortedThoughts = [...filteredThoughts].sort((a, b) => {
+    switch (sortMethod) {
+      case 'newest':
+        return parseInt(b.updatedAt) - parseInt(a.updatedAt);
+      case 'oldest':
+        return parseInt(a.updatedAt) - parseInt(b.updatedAt);
+      case 'az':
+        return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
+      case 'za':
+        return b.title.toLowerCase().localeCompare(a.title.toLowerCase());
+      case 'custom':
+        if (typeof a.order === 'number' && typeof b.order === 'number') {
+          return a.order - b.order;
+        }
+        return 0;
+      default:
+        return parseInt(b.updatedAt) - parseInt(a.updatedAt);
+    }
+  });
+
+  return (
+    <div className={`${layout === 'grid' ? 'flex flex-wrap -mx-2' : ''}`}>
+      {sortedThoughts.map((thought, index) => (
+        <ThoughtItem
+          key={thought.id}
+          thought={thought}
+          onEdit={() => onEditThought(thought)}
+          onDelete={() => onDeleteThought(thought.id)}
+          onCombine={onCombineThoughts}
+          onReorder={onReorderThought}
+          index={index}
+          layout={layout}
+          sortMethod={sortMethod}
+        />
+      ))}
+    </div>
+  );
+};
+
+export default ThoughtList;
